@@ -1,0 +1,7 @@
+com\ana\db\DatabaseClientImpl.class
+com\ana\coordinator\Coordinator.class
+com\ana\db\DatabaseClient.class
+com\ana\model\FileMetadata.class
+com\ana\model\User.class
+com\ana\ApplicationServer.class
+com\ana\node\StorageNode.class
