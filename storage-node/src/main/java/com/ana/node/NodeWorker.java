@@ -70,7 +70,7 @@ public class NodeWorker extends UnicastRemoteObject implements StorageNode {
                 // Ya existe, está bien
             }
 
-            Naming.rebind("rmi://localhost:1099/" + nodeId, this);
+            Naming.rebind("rmi://10.152.190.29:1099/" + nodeId, this);
             System.out.println("✅ Nodo '" + nodeId + "' registrado en RMI Registry.");
         } catch (Exception e) {
             throw new RemoteException("Error registrando nodo en RMI Registry", e);
@@ -206,7 +206,7 @@ public class NodeWorker extends UnicastRemoteObject implements StorageNode {
             System.out.println("🟢 Nodo '" + nodeId + "' listo y esperando conexiones...");
             System.out.println("📝 Directorio de almacenamiento: " + storagePath);
             System.out.println("📊 Espacio libre: " + formatBytes(node.getFreeSpace()));
-            System.out.println("🔌 Registrado en: rmi://localhost:1099/" + nodeId);
+            System.out.println("🔌 Registrado en: rmi://10.152.190.29:1099/" + nodeId);
             System.out.println("⏹️  Presiona Enter para detener el nodo...");
             System.in.read();
             
