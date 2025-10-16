@@ -3,6 +3,7 @@ package com.ana.node;
 import java.io.*;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,12 +18,14 @@ public class NodeWorker extends UnicastRemoteObject implements StorageNode {
     private final File storageDir;
     private final Map<String, File> fileMap; // fileId -> File
     private final Object fileMapLock = new Object();
+    private final int rmiPort;
 
-    protected NodeWorker(String nodeId, String storagePath) throws RemoteException {
-        super();
+    protected NodeWorker(String nodeId, String storagePath, int rmiPort) throws RemoteException {
+        super(rmiPort);
         this.nodeId = nodeId;
         this.storageDir = new File(storagePath);
         this.fileMap = new ConcurrentHashMap<>();
+        this.rmiPort = rmiPort;
 
         // Crear directorio de almacenamiento si no existe
         if (!storageDir.exists()) {
@@ -77,6 +80,24 @@ public class NodeWorker extends UnicastRemoteObject implements StorageNode {
         }
     }
 
+    private void registerWithRegistry(int rmiPort) throws RemoteException {
+        try {
+            // Crear Registry en puerto 1099 (solo el primer nodo)
+            try {
+                LocateRegistry.createRegistry(1099);
+                System.out.println("✅ RMI Registry iniciado en puerto 1099.");
+            } catch (Exception e) {
+                // Ya existe, está bien
+            }
+
+            // Registrar el nodo en el Registry
+            Naming.rebind("rmi://localhost:1099/" + nodeId, this);
+            System.out.println("✅ Nodo '" + nodeId + "' registrado en RMI Registry.");
+        } catch (Exception e) {
+            throw new RemoteException("Error registrando nodo en RMI Registry", e);
+        }
+    }
+
     @Override
     public String getNodeId() throws RemoteException {
         return nodeId;
@@ -101,11 +122,11 @@ public class NodeWorker extends UnicastRemoteObject implements StorageNode {
             try (FileOutputStream fos = new FileOutputStream(file)) {
                 fos.write(data);
             }
-            
+
             synchronized (fileMapLock) {
                 fileMap.put(fileId, file);
             }
-            
+
             System.out.println("💾 Archivo '" + fileId + "' almacenado en nodo '" + nodeId + "'");
         } catch (IOException e) {
             throw new RemoteException("Error guardando archivo: " + e.getMessage(), e);
@@ -122,7 +143,7 @@ public class NodeWorker extends UnicastRemoteObject implements StorageNode {
         synchronized (fileMapLock) {
             file = fileMap.get(fileId);
         }
-        
+
         if (file == null || !file.exists()) {
             throw new RemoteException("Archivo no encontrado: " + fileId);
         }
@@ -133,7 +154,8 @@ public class NodeWorker extends UnicastRemoteObject implements StorageNode {
                 int totalRead = 0;
                 while (totalRead < data.length) {
                     int read = fis.read(data, totalRead, data.length - totalRead);
-                    if (read == -1) break;
+                    if (read == -1)
+                        break;
                     totalRead += read;
                 }
                 if (totalRead != data.length) {
@@ -157,7 +179,7 @@ public class NodeWorker extends UnicastRemoteObject implements StorageNode {
         synchronized (fileMapLock) {
             file = fileMap.remove(fileId);
         }
-        
+
         if (file != null && file.exists()) {
             if (file.delete()) {
                 System.out.println("🗑️ Archivo '" + fileId + "' eliminado del nodo '" + nodeId + "'");
@@ -176,7 +198,7 @@ public class NodeWorker extends UnicastRemoteObject implements StorageNode {
         if (fileId == null || fileId.trim().isEmpty()) {
             return false;
         }
-        
+
         synchronized (fileMapLock) {
             File file = fileMap.get(fileId);
             return file != null && file.exists();
@@ -192,24 +214,25 @@ public class NodeWorker extends UnicastRemoteObject implements StorageNode {
      * Método principal para iniciar el nodo
      */
     public static void main(String[] args) {
-        if (args.length < 2) {
-            System.out.println("Uso: java -jar storage-node.jar <nodeId> <storagePath>");
-            System.out.println("Ejemplo: java -jar storage-node.jar node1 /data/node1");
+        if (args.length < 3) {
+            System.out.println("Uso: java -jar dfs-storage-node.jar <nodeId> <storagePath> <rmiPort>");
+            System.out.println("Ejemplo: java -jar dfs-storage-node.jar node1 /tmp/node1 1100");
             return;
         }
 
         String nodeId = args[0];
         String storagePath = args[1];
+        int rmiPort = Integer.parseInt(args[2]);
 
         try {
-            NodeWorker node = new NodeWorker(nodeId, storagePath);
-            System.out.println("🟢 Nodo '" + nodeId + "' listo y esperando conexiones...");
+            // Pasar el puerto RMI al constructor
+            NodeWorker node = new NodeWorker(nodeId, storagePath, rmiPort);
+            System.out.println("🟢 Nodo '" + nodeId + "' listo en puerto " + rmiPort);
             System.out.println("📝 Directorio de almacenamiento: " + storagePath);
-            System.out.println("📊 Espacio libre: " + formatBytes(node.getFreeSpace()));
             System.out.println("🔌 Registrado en: rmi://localhost:1099/" + nodeId);
             System.out.println("⏹️  Presiona Enter para detener el nodo...");
             System.in.read();
-            
+
         } catch (Exception e) {
             System.err.println("❌ Error iniciando nodo '" + nodeId + "': " + e.getMessage());
             e.printStackTrace();
@@ -220,7 +243,8 @@ public class NodeWorker extends UnicastRemoteObject implements StorageNode {
      * Formatea bytes a una representación legible
      */
     private static String formatBytes(long bytes) {
-        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024)
+            return bytes + " B";
         int exp = (int) (Math.log(bytes) / Math.log(1024));
         String pre = "KMGTPE".charAt(exp - 1) + "i";
         return String.format("%.1f %sB", bytes / Math.pow(1024, exp), pre);
