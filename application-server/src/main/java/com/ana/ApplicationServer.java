@@ -6,7 +6,11 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ana.coordinator.Coordinator;
 import com.ana.db.DatabaseClientImpl;
+
+import java.io.InputStream;
 import java.util.Base64;
+import java.util.Properties;
+
 import spark.Spark;
 
 public class ApplicationServer {
@@ -19,16 +23,23 @@ public class ApplicationServer {
             // Inicializar base de datos
             DatabaseClientImpl dbClient = new DatabaseClientImpl();
             
-            // Inicializar coordinador
-            coordinator = new Coordinator(
-                dbClient,
-                "localhost",  // registryHost
-                1099,         // registryPort
-                3             // replicaCount
-            );
+                        // Cargar configuración
+            Properties config = loadConfig();
             
+            // Obtener valores de configuración
+            String serverHost = config.getProperty("server.host", "localhost");
+            int serverPort = Integer.parseInt(config.getProperty("server.port", "8081"));
+            String registryHost = config.getProperty("node.registry.host", "localhost");
+            int registryPort = Integer.parseInt(config.getProperty("node.registry.port", "1099"));
+            int replicaCount = Integer.parseInt(config.getProperty("node.replica.count", "3"));
+            
+            // Inicializar coordinador
+            Coordinator coordinator = new Coordinator(dbClient, registryHost, registryPort, replicaCount);
+
+
             // Configurar Spark
-            Spark.port(8081);
+            Spark.ipAddress(serverHost);
+            Spark.port(serverPort);
             Spark.staticFiles.location("/public");
             
             // Configurar CORS para desarrollo
@@ -42,6 +53,8 @@ public class ApplicationServer {
             Spark.options("/*", (req, res) -> {
                 return "OK";
             });
+
+            
             
             // ========== AUTENTICACIÓN ==========
             
@@ -313,7 +326,7 @@ public class ApplicationServer {
             
             
             
-            System.out.println("✅ Application Server listo en http://localhost:8081");
+            System.out.println("✅ Application Server listo en http://192.168.1.73:8081");
             System.out.println("📝 Endpoints disponibles:");
             System.out.println("   POST /api/register");
             System.out.println("   POST /api/login");
@@ -331,6 +344,19 @@ public class ApplicationServer {
         }
     }
     
+    private static Properties loadConfig() {
+        Properties props = new Properties();
+        try (InputStream input = ApplicationServer.class
+                .getClassLoader().getResourceAsStream("application.properties")) {
+            if (input != null) {
+                props.load(input);
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ No se encontró application.properties, usando valores por defecto");
+        }
+        return props;
+    }
+
     /**
      * Método auxiliar para validar tokens
      */
