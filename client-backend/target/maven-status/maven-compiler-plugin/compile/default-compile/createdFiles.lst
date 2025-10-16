@@ -1,4 +1,4 @@
-com\ana\http\ApplicationServerClient.class
-com\ana\soap\FileServiceSOAP.class
-com\ana\soap\FileServiceImpl.class
-com\ana\ClientAppServer.class
+com/ana/soap/FileServiceSOAP.class
+com/ana/http/ApplicationServerClient.class
+com/ana/soap/FileServiceImpl.class
+com/ana/ClientAppServer.class

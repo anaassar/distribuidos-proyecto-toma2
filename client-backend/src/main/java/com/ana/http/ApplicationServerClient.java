@@ -21,7 +21,7 @@ public class ApplicationServerClient {
     
     public ApplicationServerClient() {
         // Por defecto, usa localhost:8081
-        this.baseUrl = "http://localhost:8081";
+        this.baseUrl = "http://192.168.1.73:8081";
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(30))
                 .build();
