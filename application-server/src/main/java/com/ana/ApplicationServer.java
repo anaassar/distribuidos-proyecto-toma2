@@ -16,7 +16,6 @@ import spark.Spark;
 public class ApplicationServer {
     
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static Coordinator coordinator;
     
     public static void main(String[] args) {
         try {
@@ -29,12 +28,9 @@ public class ApplicationServer {
             // Obtener valores de configuración
             String serverHost = config.getProperty("server.host", "localhost");
             int serverPort = Integer.parseInt(config.getProperty("server.port", "8081"));
-            String registryHost = config.getProperty("node.registry.host", "localhost");
-            int registryPort = Integer.parseInt(config.getProperty("node.registry.port", "1099"));
-            int replicaCount = Integer.parseInt(config.getProperty("node.replica.count", "3"));
             
             // Inicializar coordinador
-            Coordinator coordinator = new Coordinator(dbClient, registryHost, registryPort, replicaCount);
+            Coordinator coordinator = new Coordinator(dbClient);
 
 
             // Configurar Spark
@@ -326,7 +322,7 @@ public class ApplicationServer {
             
             
             
-            System.out.println("✅ Application Server listo en http://192.168.1.73:8081");
+            System.out.println("✅ Application Server listo en http://0.0.0.0:8081");
             System.out.println("📝 Endpoints disponibles:");
             System.out.println("   POST /api/register");
             System.out.println("   POST /api/login");

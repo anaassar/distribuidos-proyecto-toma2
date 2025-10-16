@@ -4,6 +4,8 @@ import com.ana.db.DatabaseClient;
 import com.ana.model.FileMetadata;
 import com.ana.model.User;
 import com.ana.node.StorageNode;
+
+import java.io.InputStream;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.util.*;
@@ -13,32 +15,44 @@ public class Coordinator {
 
     private final DatabaseClient dbClient;
     private final Map<String, StorageNode> nodeMap = new ConcurrentHashMap<>();
-    private final String registryHost;
-    private final int registryPort;
-    private final int replicaCount;
+    private Properties nodeConfig;
 
-    public Coordinator(DatabaseClient dbClient, String registryHost, int registryPort, int replicaCount) {
+    public Coordinator(DatabaseClient dbClient) {
         this.dbClient = dbClient;
-        this.registryHost = registryHost;
-        this.registryPort = registryPort;
-        this.replicaCount = replicaCount;
+        loadNodeConfiguration();
         registerKnownNodes();
     }
 
-    private void registerKnownNodes() {
-        // Mapa de nodeId -> IP de la máquina
-        Map<String, String> nodeHosts = new HashMap<>();
-        nodeHosts.put("node1", "192.168.1.5");
-        nodeHosts.put("node2", "192.168.1.6");
-        nodeHosts.put("node3", "192.168.1.7");
+    private void loadNodeConfiguration() {
+        try (InputStream input = getClass().getClassLoader()
+                .getResourceAsStream("nodes.properties")) {
+            if (input != null) {
+                this.nodeConfig = new Properties();
+                this.nodeConfig.load(input);
+                System.out.println("✅ Configuración de nodos cargada");
+            } else {
+                throw new RuntimeException("No se encontró nodes.properties");
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Error cargando nodes.properties", e);
+        }
+    }
 
-        for (Map.Entry<String, String> entry : nodeHosts.entrySet()) {
-            String nodeId = entry.getKey();
-            String nodeHost = entry.getValue();
+    private void registerKnownNodes() {
+        String[] nodeIds = {"node1", "node2", "node3"};
+        for (String nodeId : nodeIds) {
+            String nodeHost = nodeConfig.getProperty(nodeId + ".host");
+            String nodePortStr = nodeConfig.getProperty("node.port", "1099");
+            
+            if (nodeHost == null) {
+                System.err.println("⚠️ No se encontró host para " + nodeId + " en nodes.properties");
+                continue;
+            }
+            
+            int nodePort = Integer.parseInt(nodePortStr);
             try {
-                // Cada nodo está en su propia máquina
                 StorageNode node = (StorageNode) Naming.lookup(
-                        "rmi://" + nodeHost + ":1099/" + nodeId);
+                    "rmi://" + nodeHost + ":" + nodePort + "/" + nodeId);
                 if (node.isHealthy()) {
                     nodeMap.put(nodeId, node);
                     System.out.println("✅ Nodo " + nodeId + " (" + nodeHost + ") conectado.");
@@ -133,7 +147,7 @@ public class Coordinator {
                 String fileId = metadata.getId();
 
                 // Seleccionar nodos
-                List<StorageNode> nodes = getAvailableNodes(replicaCount);
+                List<StorageNode> nodes = getAvailableNodes(3);
                 if (nodes.size() < 2) {
                     throw new IllegalStateException("No hay suficientes nodos disponibles para redundancia");
                 }
